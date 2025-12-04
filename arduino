@@ -1,0 +1,151 @@
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
+
+ESP8266WebServer server(80);
+
+// =========================
+// PIN DEFINISI
+// =========================
+int pinA = D0;
+int pinB = D1;
+int pinC = D2;
+int ldrPin = D3;
+
+// =========================
+// VARIABEL FLAG
+// =========================
+bool forceOn1 = false, forceOff1 = false;
+bool forceOn2 = false, forceOff2 = false;
+bool forceOn3 = false, forceOff3 = false;
+
+bool ldrState = false;
+
+// =========================
+// FUNGSI KONTROL LED
+// =========================
+void hidupR1() { digitalWrite(pinA, HIGH); }
+void matiR1()  { digitalWrite(pinA, LOW);  }
+
+void hidupR2() { digitalWrite(pinB, HIGH); }
+void matiR2()  { digitalWrite(pinB, LOW);  }
+
+void hidupR3() { digitalWrite(pinC, HIGH); }
+void matiR3()  { digitalWrite(pinC, LOW);  }
+
+// =========================
+// HALAMAN WEB
+// =========================
+String getWebPage() {
+  String page = "<html><head><title>SMART LIGHTING</title></head><body>";
+  page += "<h2>SMART LIGHTING SYSTEM</h2>";
+  page += "<p>LDR State: ";
+  page += (ldrState == 0) ? "<b>Gelap</b>" : "<b>Terang</b>";
+  page += "</p><hr>";
+
+  page += "<h3>Ruangan 1</h3>";
+  page += "<a href='/LEDOn1'><button>ON</button></a>";
+  page += "<a href='/LEDOff1'><button>OFF</button></a><br><br>";
+
+  page += "<h3>Ruangan 2</h3>";
+  page += "<a href='/LEDOn2'><button>ON</button></a>";
+  page += "<a href='/LEDOff2'><button>OFF</button></a><br><br>";
+
+  page += "<h3>Ruangan 3</h3>";
+  page += "<a href='/LEDOn3'><button>ON</button></a>";
+  page += "<a href='/LEDOff3'><button>OFF</button></a><br><br>";
+
+  page += "</body></html>";
+  return page;
+}
+
+void setup(void) {
+  Serial.begin(115200);
+
+  pinMode(pinA, OUTPUT);
+  pinMode(pinB, OUTPUT);
+  pinMode(pinC, OUTPUT);
+  pinMode(ldrPin, INPUT_PULLUP);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Menghubungkan ke WiFi");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nTerhubung ke WiFi!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  // =========================
+  // ROUTING WEB SERVER
+  // =========================
+  server.on("/", []() {
+    server.send(200, "text/html", getWebPage());
+  });
+
+  server.on("/LEDOn1", []() {
+    forceOn1 = true; forceOff1 = false;
+    hidupR1();
+    server.send(200, "text/html", getWebPage());
+  });
+
+  server.on("/LEDOn2", []() {
+    forceOn2 = true; forceOff2 = false;
+    hidupR2();
+    server.send(200, "text/html", getWebPage());
+  });
+
+  server.on("/LEDOn3", []() {
+    forceOn3 = true; forceOff3 = false;
+    hidupR3();
+    server.send(200, "text/html", getWebPage());
+  });
+
+  server.on("/LEDOff1", []() {
+    forceOff1 = true; forceOn1 = false;
+    matiR1();
+    server.send(200, "text/html", getWebPage());
+  });
+
+  server.on("/LEDOff2", []() {
+    forceOff2 = true; forceOn2 = false;
+    matiR2();
+    server.send(200, "text/html", getWebPage());
+  });
+
+  server.on("/LEDOff3", []() {
+    forceOff3 = true; forceOn3 = false;
+    matiR3();
+    server.send(200, "text/html", getWebPage());
+  });
+
+  server.begin();
+}
+
+void loop(void) {
+  server.handleClient();
+
+  ldrState = digitalRead(ldrPin); // 0 = gelap, 1 = terang
+
+  // =========================
+  // LOGIKA OTOMATIS LDR
+  // hanya bekerja jika tidak di-force oleh pengguna
+  // =========================
+  if (!forceOn1 && !forceOff1) {
+    if (ldrState == 0) hidupR1(); else matiR1();
+  }
+
+  if (!forceOn2 && !forceOff2) {
+    if (ldrState == 0) hidupR2(); else matiR2();
+  }
+
+  if (!forceOn3 && !forceOff3) {
+    if (ldrState == 0) hidupR3(); else matiR3();
+  }
+}
